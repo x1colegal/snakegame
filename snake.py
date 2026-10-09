@@ -5,6 +5,7 @@ import math
 import secrets
 import signal
 import socket
+import sys
 import ssl
 import time
 
@@ -4115,51 +4116,49 @@ async def main():
     config = TLS13Config()
 
 
-    sock = socket.socket(
+    modes = {
+        "-4": [socket.AF_INET],
+        "-6": [socket.AF_INET6],
+    }
+
+    args = sys.argv[1:]
+
+    if len(args) > 1 or (args and args[0] not in modes):
+        raise SystemExit("Usage: python snake.py [-4|-6]")
+
+    families = modes[args[0]] if args else [
+        socket.AF_INET,
         socket.AF_INET6,
-        socket.SOCK_STREAM
-    )
-
-
-    sock.setsockopt(
-        socket.IPPROTO_IPV6,
-        socket.IPV6_V6ONLY,
-        1
-    )
-
-
-    sock.setsockopt(
-        socket.SOL_SOCKET,
-        socket.SO_REUSEADDR,
-        1
-    )
-
-
-    sock.bind(
-        (
-            HOST,
-            PORT
-        )
-    )
-
-
-    sock.listen(
-        100
-    )
-
-
-    sock.set_inheritable(
-        True
-    )
-
-
-    config.bind = [
-        "fd://" +
-        str(
-            sock.fileno()
-        )
     ]
 
+    sockets = []
+
+    for family in families:
+        sock = socket.socket(family, socket.SOCK_STREAM)
+
+        if family == socket.AF_INET6:
+            sock.setsockopt(
+                socket.IPPROTO_IPV6,
+                socket.IPV6_V6ONLY,
+                1
+            )
+
+        sock.setsockopt(
+            socket.SOL_SOCKET,
+            socket.SO_REUSEADDR,
+            1
+        )
+
+        address = "0.0.0.0" if family == socket.AF_INET else "::"
+        sock.bind((address, PORT))
+        sock.listen(100)
+        sock.set_inheritable(True)
+        sockets.append(sock)
+
+    config.bind = [
+        "fd://" + str(sock.fileno())
+        for sock in sockets
+    ]
 
     config.certfile = (
         CERT_FILE
@@ -4222,12 +4221,12 @@ async def main():
     )
 
     print(
-        "HTTPS: [::]:8443",
+        "HTTPS: " + ", ".join(("[::]" if s.family == socket.AF_INET6 else "0.0.0.0") + ":" + str(PORT) for s in sockets),
         flush=True
     )
 
     print(
-        "IPv6-only: IPV6_V6ONLY=1",
+        "IPv6 socket: IPV6_V6ONLY=1" if socket.AF_INET6 in families else "IPv6 socket: disabled",
         flush=True
     )
 
@@ -4304,7 +4303,8 @@ async def main():
         except asyncio.CancelledError:
             pass
 
-        sock.close()
+        for sock in sockets:
+            sock.close()
 
 
 if __name__ == "__main__":

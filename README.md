@@ -12,7 +12,7 @@ Snake Arena uses a fully server-authoritative architecture. All movement, collis
 - 35 AI-controlled bots
 - Custom SnakeProtocol 1
 - Windows-1252 character encoding
-- IPv6-only server
+- Dual-stack IPv4/IPv6 server
 - TLS 1.3 only
 - HTTP/2 and HTTP/1.1 support
 - 10 Hz server tick rate
@@ -33,7 +33,7 @@ Snake Arena uses a fully server-authoritative architecture. All movement, collis
 - Python 3.10+
 - Hypercorn
 - TLS certificate and private key
-- IPv6 networking
+- IPv4 or IPv6 networking
 - Modern web browser
 
 Install Hypercorn:
@@ -80,8 +80,8 @@ A valid TLS certificate trusted by the browser is recommended.
 |---|---|
 | Host | `::` |
 | Port | `8443` |
-| Address Family | IPv6 |
-| IPv6 Only | Enabled |
+| Address Family | IPv4 and IPv6 |
+| Default Network Mode | Dual-stack |
 | TLS | 1.3 only |
 | ALPN | `h2`, `http/1.1` |
 | Game Protocol | SnakeProtocol 1 |
@@ -495,34 +495,64 @@ key.pem
 
 The application does not directly accept unencrypted HTTP connections.
 
-## IPv6
+## Network Modes
 
-Snake Arena explicitly creates an IPv6 socket:
+Snake Arena supports three network modes using independent sockets.
 
-```python
-socket.socket(
-    socket.AF_INET6,
-    socket.SOCK_STREAM
-)
+### Dual-stack (Default)
+
+```bash
+python snake.py
 ```
 
-IPv6-only mode is enabled:
+Listeners:
 
-```python
-sock.setsockopt(
-    socket.IPPROTO_IPV6,
-    socket.IPV6_V6ONLY,
-    1
-)
+```text
+0.0.0.0:8443
+[::]:8443
 ```
 
-Listening address:
+Both IPv4 and IPv6 connections are accepted.
+
+The IPv6 socket uses IPV6_V6ONLY=1.
+IPv4 traffic is handled by the separate IPv4 socket.
+
+### IPv4-only
+
+```bash
+python snake.py -4
+```
+
+Listener:
+
+```text
+0.0.0.0:8443
+```
+
+Only IPv4 connections are accepted.
+
+### IPv6-only
+
+```bash
+python snake.py -6
+```
+
+Listener:
 
 ```text
 [::]:8443
 ```
 
-IPv4 connections are not accepted directly by the application socket.
+Only IPv6 connections are accepted.
+IPV6_V6ONLY=1 is enabled.
+
+### Network Implementation
+
+The server uses AF_INET sockets for IPv4 and AF_INET6 sockets for IPv6.
+
+Each socket is configured with SO_REUSEADDR and passed to Hypercorn using fd:// descriptors.
+
+All modes support TLS 1.3, HTTP/2, HTTP/1.1, and SnakeProtocol 1.
 
 ## HTTP Responses
 
@@ -579,7 +609,7 @@ HTTP access and error logging are provided by Hypercorn.
 | Transport | HTTPS |
 | TLS | TLS 1.3 |
 | HTTP | HTTP/2 and HTTP/1.1 |
-| Network | IPv6-only |
+| Network | Dual-stack, IPv4-only, IPv6-only |
 | Game Simulation | Server-authoritative |
 
 ## Notes
