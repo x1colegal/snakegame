@@ -2086,6 +2086,7 @@ async function getState() {
           sessionId
         ),
         {
+          signal: AbortSignal.timeout(3000),
           cache:
             "no-store"
         }
@@ -4047,7 +4048,7 @@ async def game_loop():
 
         async with world_lock:
 
-            server_tick()
+            await asyncio.to_thread(server_tick)
 
 
         elapsed = (
