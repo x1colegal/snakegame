@@ -7,6 +7,8 @@ import signal
 import socket
 import sys
 import ssl
+import ctypes
+import ctypes.util
 import time
 
 from hypercorn.asyncio import serve
@@ -4104,6 +4106,17 @@ class TLS13Config(
             ]
         )
 
+
+        libssl = ctypes.CDLL(ctypes.util.find_library("ssl"))
+        libssl.SSL_CTX_set_ciphersuites.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        libssl.SSL_CTX_set_ciphersuites.restype = ctypes.c_int
+        ctx_ptr = ctypes.c_void_p.from_address(id(context) + 2 * ctypes.sizeof(ctypes.c_void_p)).value
+        if libssl.SSL_CTX_set_ciphersuites(ctx_ptr, b"TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256") != 1:
+            raise RuntimeError("Falha ao configurar cipher suites TLS 1.3")
+        context.options |= ssl.OP_CIPHER_SERVER_PREFERENCE
+        libssl.SSL_CTX_clear_options.argtypes = [ctypes.c_void_p, ctypes.c_uint64]
+        libssl.SSL_CTX_clear_options.restype = ctypes.c_uint64
+        libssl.SSL_CTX_clear_options(ctx_ptr, 1 << 21)
 
         return context
 
