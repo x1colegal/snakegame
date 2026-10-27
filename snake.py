@@ -163,7 +163,7 @@ def refill_pellets():
 
         attempts += 1
 
-        if attempts > 10000:
+        if attempts > 300:
             break
 
         if alive_snakes:
@@ -420,7 +420,7 @@ def kill_snake(
 # ============================================================
 
 def choose_bot_direction(
-    bot
+    bot, occupied
 ):
 
     if (
@@ -499,7 +499,6 @@ def choose_bot_direction(
         )
     ]
 
-    occupied = occupied_cells()
 
     safe = []
 
@@ -585,8 +584,9 @@ def server_tick():
     snakes = all_snakes()
 
     # Bots make their decisions on the server.
+    occupied = occupied_cells()
     for bot in bots.values():
-        choose_bot_direction(bot)
+        choose_bot_direction(bot, occupied)
 
     # Apply directions.
     for snake in snakes.values():
